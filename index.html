@@ -620,8 +620,28 @@ async function viewAttachment(recordType,recordId,fieldName){
   const blob=await getFile(rec[fieldName].key);
   if(!blob){toast('File not found');return}
   const url=URL.createObjectURL(blob);
-  window.open(url,'_blank');
-  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  const fname=rec[fieldName].name||'document.pdf';
+
+  // Inline preview with iframe — works on iOS
+  const preview=document.createElement('div');
+  preview.id='doc-preview';
+  preview.style.cssText='position:fixed;inset:0;z-index:100;background:#333;display:flex;flex-direction:column;';
+
+  const bar=document.createElement('div');
+  bar.style.cssText='background:#1c1c1a;color:#f5f2ec;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;gap:12px;';
+  bar.innerHTML=`
+    <button style="background:#f5f2ec;color:#1c1c1a;border:0;padding:8px 18px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer" onclick="closeDocPreview()">← Back</button>
+    <span style="font-size:13px;opacity:0.7;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(fname)}</span>
+    <a href="${url}" download="${escapeHTML(fname)}" style="background:#0d6d56;color:#fff;border:0;padding:8px 18px;border-radius:8px;font-weight:600;font-size:13px;text-decoration:none;display:inline-block">Download</a>
+  `;
+
+  const iframe=document.createElement('iframe');
+  iframe.src=url;
+  iframe.style.cssText='flex:1;border:0;width:100%;background:#fff;';
+
+  preview.appendChild(bar);
+  preview.appendChild(iframe);
+  document.body.appendChild(preview);
 }
 async function downloadAttachment(recordType,recordId,fieldName){
   const coll=recordType==='biz'?state.businesses:state.employees;
@@ -630,8 +650,13 @@ async function downloadAttachment(recordType,recordId,fieldName){
   const blob=await getFile(rec[fieldName].key);
   if(!blob){toast('File not found');return}
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=rec[fieldName].name;a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const a=document.createElement('a');
+  a.href=url;a.download=rec[fieldName].name||'document.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  toast('Downloading…');
 }
 async function removeAttachment(recordType,recordId,fieldName){
   if(!confirm('Remove this file?')) return;
@@ -1668,7 +1693,8 @@ async function exportData(){
   }
   const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='ledger-backup-'+todayISO()+'.json';a.click();
+  const a=document.createElement('a');a.href=url;a.download='ledger-backup-'+todayISO()+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
   URL.revokeObjectURL(url);toast('Backup downloaded ('+fmtFileSize(blob.size)+')');
 }
 function blobToBase64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}
